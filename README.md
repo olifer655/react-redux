@@ -160,3 +160,53 @@ export default function (mapStateToProps, mapDispatchToProps) {
 但在有些比较复杂的情况下，这种同步无法很好的解决我们的问题，比如点击按钮 -> 获取服务器的数据 -> 渲染视图，因为获取数据是异步的，所以我们需要引入中间件来改变redux的同步流程，实现 action => middleware => reducer， 点击按钮相当于dispatch 触发action， 然后middleware开始工作，获取数据后触发reducer渲染视图。
 
 中间件让我们可以改变数据流，实现异步、日志、错误处理等。
+
+以日志输出 Logger 为例：
+
+```js
+import { createStore, applyMiddleware } from 'redux'
+/** 定义初始 state**/
+const initState = {
+  score : 0.5
+}
+/** 定义 reducer**/
+const reducer = (state, action) => {
+  switch (action.type) {
+    case 'CHANGE_SCORE':
+      return { ...state, score:action.score }
+    default:
+      break
+  }
+}
+
+/** 定义中间件 **/
+const logger = function({ getState, dispatch }) {
+  return function(next) {
+    return function(action) {
+      console.log('【logger】即将执行:', action)
+      // 调用 middleware 链中下一个 middleware 的 dispatch。
+      let returnValue = next(action)
+
+      console.log('【logger】执行完成后 state:', getState())
+      return returnValue
+    }
+  } 
+}
+
+/** 创建 store**/
+let store = createStore(reducer, initState, applyMiddleware(logger))
+
+/** 现在尝试发送一个 action**/
+store.dispatch({
+  type: 'CHANGE_SCORE',
+  score: 0.8
+})
+/** 打印:**/
+// 【logger】即将执行: { type: 'CHANGE_SCORE', score: 0.8 }
+// 【logger】执行完成后 state: { score: 0.8 }
+```
+redux 中间件通过改写 store.dispatch 方法实现了action -> reducer的拦截，从上面的描述中可以更加清晰地理解 redux 中间件的洋葱圈模型：
+
+```js
+中间件A -> 中间件B-> 中间件C-> 原始 dispatch -> 中间件C -> 中间件B -> 中间件A
+```
